@@ -1,0 +1,592 @@
+
+
+RFC:  791
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                           INTERNET PROTOCOL
+                                    
+                                    
+                         DARPA INTERNET PROGRAM
+                                    
+                         PROTOCOL SPECIFICATION
+                                    
+                                    
+                                    
+                             September 1981
+
+
+
+
+
+
+
+
+
+
+
+
+
+                              prepared for
+
+               Defense Advanced Research Projects Agency
+                Information Processing Techniques Office
+                         1400 Wilson Boulevard
+                       Arlington, Virginia  22209
+
+
+
+
+
+
+
+                                   by
+
+                     Information Sciences Institute
+                   University of Southern California
+                           4676 Admiralty Way
+                   Marina del Rey, California  90291
+
+
+
+September 1981                                                          
+                                                       Internet Protocol
+
+
+
+                           TABLE OF CONTENTS
+
+    PREFACE ........................................................ iii
+
+1.  INTRODUCTION ..................................................... 1
+
+  1.1  Motivation .................................................... 1
+  1.2  Scope ......................................................... 1
+  1.3  Interfaces .................................................... 1
+  1.4  Operation ..................................................... 2
+
+2.  OVERVIEW ......................................................... 5
+
+  2.1  Relation to Other Protocols ................................... 9
+  2.2  Model of Operation ............................................ 5
+  2.3  Function Description .......................................... 7
+  2.4  Gateways ...................................................... 9
+
+3.  SPECIFICATION ................................................... 11
+
+  3.1  Internet Header Format ....................................... 11
+  3.2  Discussion ................................................... 23
+  3.3  Interfaces ................................................... 31
+
+APPENDIX A:  Examples & Scenarios ................................... 34
+APPENDIX B:  Data Transmission Order ................................ 39
+
+GLOSSARY ............................................................ 41
+
+REFERENCES .......................................................... 45
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                [Page i]
+
+
+                                                          September 1981
+Internet Protocol
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[Page ii]                                                               
+
+
+September 1981                                                          
+                                                       Internet Protocol
+
+
+
+                                PREFACE
+
+
+
+This document specifies the DoD Standard Internet Protocol.  This
+document is based on six earlier editions of the ARPA Internet Protocol
+Specification, and the present text draws heavily from them.  There have
+been many contributors to this work both in terms of concepts and in
+terms of text.  This edition revises aspects of addressing, error
+handling, option codes, and the security, precedence, compartments, and
+handling restriction features of the internet protocol.
+
+                                                           Jon Postel
+
+                                                           Editor
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                              [Page iii]
+
+
+
+                                                          September 1981
+
+
+RFC:  791
+Replaces:  RFC 760
+IENs 128, 123, 111,
+80, 54, 44, 41, 28, 26
+
+                           INTERNET PROTOCOL
+
+                         DARPA INTERNET PROGRAM
+                         PROTOCOL SPECIFICATION
+
+
+
+                            1.  INTRODUCTION
+
+1.1.  Motivation
+
+  The Internet Protocol is designed for use in interconnected systems of
+  packet-switched computer communication networks.  Such a system has
+  been called a "catenet" [1].  The internet protocol provides for
+  transmitting blocks of data called datagrams from sources to
+  destinations, where sources and destinations are hosts identified by
+  fixed length addresses.  The internet protocol also provides for
+  fragmentation and reassembly of long datagrams, if necessary, for
+  transmission through "small packet" networks.
+
+1.2.  Scope
+
+  The internet protocol is specifically limited in scope to provide the
+  functions necessary to deliver a package of bits (an internet
+  datagram) from a source to a destination over an interconnected system
+  of networks.  There are no mechanisms to augment end-to-end data
+  reliability, flow control, sequencing, or other services commonly
+  found in host-to-host protocols.  The internet protocol can capitalize
+  on the services of its supporting networks to provide various types
+  and qualities of service.
+
+1.3.  Interfaces
+
+  This protocol is called on by host-to-host protocols in an internet
+  environment.  This protocol calls on local network protocols to carry
+  the internet datagram to the next gateway or destination host.
+
+  For example, a TCP module would call on the internet module to take a
+  TCP segment (including the TCP header and user data) as the data
+  portion of an internet datagram.  The TCP module would provide the
+  addresses and other parameters in the internet header to the internet
+  module as arguments of the call.  The internet module would then
+  create an internet datagram and call on the local network interface to
+  transmit the internet datagram.
+
+  In the ARPANET case, for example, the internet module would call on a
+
+
+                                                                [Page 1]
+
+
+                                                          September 1981
+Internet Protocol
+Introduction
+
+
+
+  local net module which would add the 1822 leader [2] to the internet
+  datagram creating an ARPANET message to transmit to the IMP.  The
+  ARPANET address would be derived from the internet address by the
+  local network interface and would be the address of some host in the
+  ARPANET, that host might be a gateway to other networks.
+
+1.4.  Operation
+
+  The internet protocol implements two basic functions:  addressing and
+  fragmentation.
+
+  The internet modules use the addresses carried in the internet header
+  to transmit internet datagrams toward their destinations.  The
+  selection of a path for transmission is called routing.
+
+  The internet modules use fields in the internet header to fragment and
+  reassemble internet datagrams when necessary for transmission through
+  "small packet" networks.
+
+  The model of operation is that an internet module resides in each host
+  engaged in internet communication and in each gateway that
+  interconnects networks.  These modules share common rules for
+  interpreting address fields and for fragmenting and assembling
+  internet datagrams.  In addition, these modules (especially in
+  gateways) have procedures for making routing decisions and other
+  functions.
+
+  The internet protocol treats each internet datagram as an independent
+  entity unrelated to any other internet datagram.  There are no
+  connections or logical circuits (virtual or otherwise).
+
+  The internet protocol uses four key mechanisms in providing its
+  service:  Type of Service, Time to Live, Options, and Header Checksum.
+
+  The Type of Service is used to indicate the quality of the service
+  desired.  The type of service is an abstract or generalized set of
+  parameters which characterize the service choices provided in the
+  networks that make up the internet.  This type of service indication
+  is to be used by gateways to select the actual transmission parameters
+  for a particular network, the network to be used for the next hop, or
+  the next gateway when routing an internet datagram.
+
+  The Time to Live is an indication of an upper bound on the lifetime of
+  an internet datagram.  It is set by the sender of the datagram and
+  reduced at the points along the route where it is processed.  If the
+  time to live reaches zero before the internet datagram reaches its
+  destination, the internet datagram is destroyed.  The time to live can
+  be thought of as a self destruct time limit.
+
+
+[Page 2]                                                                
+
+
+September 1981                                                          
+                                                       Internet Protocol
+                                                            Introduction
+
+
+
+  The Options provide for control functions needed or useful in some
+  situations but unnecessary for the most common communications.  The
+  options include provisions for timestamps, security, and special
+  routing.
+
+  The Header Checksum provides a verification that the information used
+  in processing internet datagram has been transmitted correctly.  The
+  data may contain errors.  If the header checksum fails, the internet
+  datagram is discarded at once by the entity which detects the error.
+
+  The internet protocol does not provide a reliable communication
+  facility.  There are no acknowledgments either end-to-end or
+  hop-by-hop.  There is no error control for data, only a header
+  checksum.  There are no retransmissions.  There is no flow control.
+
+  Errors detected may be reported via the Internet Control Message
+  Protocol (ICMP) [3] which is implemented in the internet protocol
+  module.
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                [Page 3]
+
+
+                                                          September 1981
+Internet Protocol
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[Page 4]                                                                
+
+
+September 1981                                                          
+                                                       Internet Protocol
+
+
+
+                              2.  OVERVIEW
+
+2.1.  Relation to Other Protocols
+
+  The following diagram illustrates the place of the internet protocol
+  in the protocol hierarchy:
+
+                                    
+                 +------+ +-----+ +-----+     +-----+  
+                 |Telnet| | FTP | | TFTP| ... | ... |  
+                 +------+ +-----+ +-----+     +-----+  
+                       |   |         |           |     
+                      +-----+     +-----+     +-----+  
+                      | TCP |     | UDP | ... | ... |  
+                      +-----+     +-----+     +-----+  
+                         |           |           |     
+                      +--------------------------+----+
+                      |    Internet Protocol & ICMP   |
+                      +--------------------------+----+
+                                     |                 
+                        +---------------------------+  
+                        |   Local Network Protocol  |  
+                        +---------------------------+  
+
+                         Protocol Relationships
+
+                               Figure 1.
+
+  Internet protocol interfaces on one side to the higher level
+  host-to-host protocols and on the other side to the local network
+  protocol.  In this context a "local network" may be a small network in
+  a building or a large network such as the ARPANET.
+
+2.2.  Model of Operation
+
+  The  model of operation for transmitting a datagram from one
+  application program to another is illustrated by the following
+  scenario:
+
+    We suppose that this transmission will involve one intermediate
+    gateway.
+
+    The sending application program prepares its data and calls on its
+    local internet module to send that data as a datagram and passes the
+    destination address and other parameters as arguments of the call.
+
+    The internet module prepares a datagram header and attaches the data
+    to it.  The internet module determines a local network address for
+    this internet address, in this case it is the address of a gateway.
+
+
+                                                                [Page 5]
+
+
+                                                          September 1981
+Internet Protocol
+Overview
+
+
+
+    It sends this datagram and the local network address to the local
+    network interface.
+
+    The local network interface creates a local network header, and
+    attaches the datagram to it, then sends the result via the local
+    network.
+
+    The datagram arrives at a gateway host wrapped in the local network
+    header, the local network interface strips off this header, and
+    turns the datagram over to the internet module.  The internet module
+    determines from the internet address that the datagram is to be
+    forwarded to another host in a second network.  The internet module
+    determines a local net address for the destination host.  It calls
+    on the local network interface for that network to send the
+    datagram.
+
+    This local network interface creates a local network header and
+    attaches the datagram sending the result to the destination host.
+
+    At this destination host the datagram is stripped of the local net
+    header by the local network interface and handed to the internet
+    module.
+
+    The internet module determines that the datagram is for an
+    application program in this host.  It passes the data to the
+    application program in response to a system call, passing the source
+    address and other parameters ½ÔÁ[ıCïô¡Í3¸‡ßÊC¶+¦ÿöˆfß1™7é#šµ<tÏÄhRòì]ó::{ìœÛûƒ×üÄ{oÚõ3|ƒ÷n ì„ eTñíÜ$=#O7Ì©à.½úwsöfÿ½;}È‹‰a7*ºı·§û8Àª\}†.KtàßÅÂá‡Âš¹‚ıÿ
+n·œŞÆ:}"÷½Ïƒ0É§úï+ˆ’/é4àç3üP~<8zI‡	?¾;0¯‚¤I'GÂ·¯ÿ}sùÉ3óˆœn§i4É’gïüı™3­@Ì[4ıª"ß«×®^ÄÌsé¿$”ÆÑyä–òòËøéíå»t™ñ@ØÓœƒí8â—óN+!=æ¸âøÔr´Êe•£K%õ%«Æ3AA(„xô(³Gã¼B±w³-KÏ–9ŒÃg”£ÖXHÇYóÜó‡œ† ÏÒÒÒŸÃÊRh±«
+L˜ßòòËO6_ÓĞ÷Šáégn”}éñ®È]‚İÇ½Ç¸\ ¾Åx™Àç_ê‚;ıòëÑ_[¾ózÄ?èÍK·wô~?È@,mgçåunØ*›mØRşÑ4ê­›ew“¡ÙÚûV¬A¶!ß‹wU*µâæ³}“ºøÛçåwb­­¸uÌ:°uĞKªàI’µ*(K––Eâe•OAeaT¦²ç2Xù=%¹ÊF ùM@¨Pıä˜ëæ%YûƒÄh¦¯«j	¡´--™9X×Û3­OÄÈÉ¹;ŸaHÍß‘tÛ™Dá¦…)9Y“O"¿2+Å½¸LšÙmC–.Ó¾Ï»-¤#U?\j¤1Ùyéå‹jÇôÖ£Ø`b£¼ÑDºÌV	=`¬oö+è÷ğ§rPPÔ–˜Øpé>)rõ¸ª†Î£;¤r>³éà2V¿˜”â‡ñë¾c^ÔÇmB…ìíj»WÊN¦’2&W5q¿ı`@ 4¦†nÊ2:úÿ……?‚zYŸz±¼Öø«LÇ¡|+êbœW2)zH3ITQ1Š÷TôMajQ_²^'šÁ ÍÁŸÉ—M-Bó–)·{EÆµ(£µßÑ8SÍÄ ‡)×_€.¬÷ÎmÂmÇpL·ÏhO¢óYMÇ@‘;Ê-9;zjŒ´5—Œö©‚b{ë0ÜTšÄ¤b	¹[‹È©jå9Î9{.Ë]=ˆÉ:Ó-ÿ=L©n$·2é–ëDé*ƒYÅ‘eô‚ô3Rõ-µİ_e‡½³ØÅÛöÒT
+
+–ê,å)P£‘]ŠS·Œ4‘j"¼Á´&v	í_¡ª}‹àXèÃâ9*v¦1ŞG7¨äX¯ğ‘Ò¶36s¸É
+<Ç¦Â-ƒáöAP£€m-v$NXÛ5;.Bƒ±Ğ×–%wfou#šŞp@µ'•ÒÚÚÍF…Q(¤ám@y€y*‹â×¬Ñ»õîüXÊ¦€›ğÌ6ksu}K Œ‹	Zm5ÃMçMM„auCáÀm¦geGÏÆïoi÷lß©IÚ¼PR	É¡=-q¦G³AşQMÔ<Ä±ÀBfãÙûX%>FÜ„²äŞ™áCıÏ"$Ç|ä²i6À@ÁgeEeİY(„1y%Ó=¦ºô8%DGÊS!K¤—H6–pèşÚÿ9R»ÿ„¯Ñt±¿/ÿ.¶¯‡™µÔ|D·øŒoñ—˜î¶í½µßîá†&¼şpp¸‡¼æM<LEBĞ¶vz}mÍ‰ğ}tg”&ô:¬6‡Hâk$‰wÙ°ÈÄS%iõ'#„RôıŞ‰Qèğ Ïñ•[s;ï÷Ç	Ä¶œ!±àIÁ>yè¢òcl2zıb4«¯R&ã[#´Ä@¤ÑL­YÎókÕCı‹Ûü¢Zá@r~è¤ŸvLZ»K(ó	ã½¼ûÁ³Ãwû'l‹¥ñ~^KÌ8ú!ÊÈÂ[¡EßJ½D…;‡ã- ×9DãàèïÏlòÑ½~méìíŠXä–@‰AI?(ñu8/4üàèÁ£Áº~X2£ığtù‰µş‘õB?päŒÃ|~²›æå%œê²y¹½,w^Æ½VizËÏæıõè}ğÙÔß0{Wo@ºkß|Ù“%ˆ6Bu3b|ûxxàÙóøVŒ÷ø¹óÆ™W·Û¯^Tù|Qòîe&Ä ½Ù}sAıy·óŸKôKøC„æÖ 4ŒÂ0Û`h%A•ªD¦€‰Z€ÆÑw/º‰XĞÅ£‰Ç¦1r/±ÔpãÛu
+õLt™DæÿŞxú½¯@ú™#¹i0ñ<ôæŞrJ(;~3î[Ác×y5Ê¦½Ä(PH…Ğê—tR¨·OĞÜGªğq2áwÙ¼Á+ÃÌQ^¯Dé?ŒØqˆª°’dn„
+	>Je™ê¹ÜvTèwÈğÁÂ=XÇ}Rü6Cí@ƒ\ã˜4I}Ä=€€Ët-ñÒ¦Yc‚÷±óŸ³áe”S	¦À ©QŒ!±y!êLq+şk±'òLæÚÍşĞ4gµÔYÆØıJ2ò¯°>Ï$ŞQ©KN{ÈN‡%“r°ı‘†àaÑœX³v…%Ê¾µ¦Ğÿ–E§“ø¥lĞ´>ë!fæãZm´ã“+Ó£˜p±ÒıšçS´˜y¹‹…øõÖlæ†_+¹Ø
+lS¹“·t­
+‚‘”âğ&{¯ˆ‚Úò+\äQq‘Ó&]2ZÍe¯Ñ¨¹{1bsòGJ(§Ï‘•´FòŠq­‰¯“ ¿­ö”Ø¡Çìh‚÷yº+fÕaÇQ D]zZQ^.†G¤œA—äRƒgÂ-oA0Mœc÷ÂÙîqzj¬?W¹¦h†’'YôRşD‘ëç™¤•áâ°CÂ4õu!nÏà°A;Û‡5ÇPK®]b×–"ÃŞ³½Ì‡!»‘éLqŞÇåQ%ãj†É#~úf­œM+É—§œBÈ£fejníÒÙÑé²Ø×Û™·¨åâNÕìtÅÃ(äY£-ƒÉù²0†fÚº
+ 25¦£ì¶§Üe:“ã]¿£bZpÃƒ$ñÉæoØ²‡’¤Ó4ïHZa…'İ¶Àš!H0(U²Ö@¹c?}ö©™+‚ÑkµÔÓ¦»<ÆoÄ¢¨`SRûn÷`•tÔñ´Q^G±ì
+€[àÆyÂV«õòÌoçª$Ü³Æ—A}4{ÔS^ÿ$Â§˜,áå»€hLs¼÷mYû"*†Ø IBœr€İ%5à%Fı5"ÀHúAYÔB:‹>ÍÎ-Ñ\ãæ ‹³IèŸØzhc™Éÿ’±´iv“æ¦1#BXœ~Ì¿{@(yäN«HY¬}·–¹£T Õhv¾¯#.ÇGƒ^`•ñh*5Ë‚ôÈP.È)Ö:e/;3-2{&LwÙ{ ò6¹CBJÑÎsIÌBâj¸÷/ğWµÓí}áñSÑpé»¾üÙ âú33Ğ	ãP„.šİçs#ı"G[¡VO‚£2„bšçe\¢‰¾´è”'Y/TĞe›âşp˜fnyÏàÑ’İãqa°Ğ¡E <)&ü”âÃÏ¿Í
+©2Ë¼”µ,-§¨Á®K*Øª˜=‡9è#f|z¸*á‚Æç÷aÖ°G›q÷Œ3î¬“ÃpOë8•$‚ŠÈœø¯T´H~Ò$ê¼%Äºú¶j‰EA8äy‡\×zZìtƒû.‹æz DW•·&%£PïdxDİ1RÏ€k#¹V¹Û‘AÕBÍ½¬ò‹‘FHq¼)ŞSúgÌòÆ>%ì’ŸómmVn¦7û—fáÌù%`Fé‰o¸µ¨P]©oÊ"haæC2ğ©{Z¸j)d_"ÚQUàg–­j%8Øá‡‚ÁÖ·¼“ˆªª¯®o©
+)]TxI¢½ĞîëG9	´D=4vİ½ÅEfXH>“Z¤ÓÈRâç˜°šLæØS<ÙON5!’Å‘ÏM„VDJ>#3ÛŒ—•,êÆû?1å,Tíáœ(Ì'6AGøpè¦äS[|«+Ú^M?°j_‚ø§-•E¸S®½3$ŒIk£T¡ıõl,‘|t8X‹n8ÃbCY“GrÃhÄåÉâ²ô“²»Jsëi—€ÎM})t:ÄÂV®gx­^…¶ UÎ˜US\¾§¨‹û92’7,Ş±|¶ñ½Púé($ºÔ3›qÈ?sÉ¦(XŒ“…¹yª’fãÄùşRSóé@Ê'¾¥œ/[æyvlÿb®ÄƒæQ#‡îFÕ«j!42 cfRr6ˆÏ¸—%KÑ{ 3³§ì&qà!×¨j9²•rd]<E'}QhYÎ$’+ôÁhŸE±@^‚"yHåX_äÅéá|VÊ‹hÒ’CÂ‘Õgª"u–eû¬ÌQTaÚ[ÎIºµkcòƒ+]¸VF‘Â¥•´¬ç~b?£z+,N;¯{)yšQÇ9œín”¤Ø±ù>‘§àÃÅ8’>-X)iÈ(¨¢ùp6°A±¼¢Ehj¿Tû>8”U,”ºœ)µ>¥â
+“y’«¤j	§?6*¨t!¡Er4µëpÙ³€óˆŞ%ä+ g„Šha´Ì]ä7bûô—¢iÚ¿S	O89'±@‘\kT{£ŒQo:ËQnH—&ÈÙ‰‡D³c»Gâ°ÅUæYöiªº¤¥Ñdbf¬r~Ñ]+¶bŒÔeÜXİXPTúC‹Â]€)Ä”³§Š2 TQ	–½©kùnª¾€ğA-¨zÑ°†Šœ"?C&;º­1ÀQ%)ˆïbÙ¾ßfäÄè¹¹Ê7YEíñ†¤—Qe~o€¥*È	§‰JW³jÌ¾è);<ÆÛD£÷„J	šîM
+IPaiK.g 2Xáÿ\š
+÷(™’v9â`ÏôzUÀ^Uƒ«[¹P8_^5ûIte8.s4^!Û¢Õ´7%.ÖæG6PJÎ-GËƒvT‡K­ K%«+ÙRõa1­fİÖhâ¬{œ&¹®zï£Oƒ•bs!0d3Ûø#º"È;†T„Ì7}“¯–}˜ Iù\DT^”«VpUJ@oÕífè5›vÅÂª3Îø®­KF˜ )×(7(e#“Æ«Z˜º KB¥jIG¸ÕOæÖ{d…Áñ¥ş½ˆüøªÕKCÙ>µÈÀ¥C¾Ø	56á¡]º&áiNo	Ç<qô´Ñçe£;\3äq@Ñaµx*­1ÅO§¿à"nš.5x²¨şÉâ«ÿ­	ÛÀ†fÕ¤^&ËØéşû=·TWƒb;ÓsgG§=TVzáu|vB}zîD“½ƒrn÷êKÇ2£6qDol€îUÒ2W¾‚aà«ù}@qğÀ4ıaFğÇÄÎ§ßa*c$È<yøN<ÓqƒX|R¸¢À–Ã¡ƒ/[m”Ó'¨Ê7´'>Í„.Ò&ÁW_‡¨·£ÿƒûà«¯4´t$&pÅe,£X]ÎÄÛT%´“á­c3SãeÎû€xÜSÛ®®aõ‰‘;ÉDr¦˜DÄÅÑNöwrKŠ!Œ9-z. ¡a¼İ‰/wŸT7J<tg5áàa»ûäø
+ì¾Û(ôúïêÓOÓû‡f90y§rÙ™ÑßQF×zø?bÜÊËBû¾xŠ©:›ZŒ-05TÄ‡`{¾'•hs,¶Ë¿ğLÉÂÅ‚µWp:á=4Œ—ew’kóªŠ\5àÀ-¢ÿ¨7 ›Ã²ò·< ZÉlÉH¦Ji:,ÙÀîº50²ßI2øÑ$ú›>ÊªfVƒLz>ReÄÜÂÔIRşKÅ”—‘Jó¡<¿úğŞ¡ÊÄĞêöOp=¦P”¼SÄå„aØúW·´Ò”û@´5.lNØr)Öê¦êBÔ•öÍ¿MhíË!.8©õ_åÁ“¢â.N0äNÌP”à*atf(eµ‘ñ‚ äGN+àLÂhlT&¤×ã©Êü8Â€#®dB&ÔÊc|ò®¯GDæåo*À´[	*Øh,˜µ¡Ù“t.qŒg70åği¢£ò›i:åj6¥ĞÉº66ÎÑÈQÔãqJM#ìÖD*¤êë‚‹šE†ğƒ,]Ò´şVìÀ)’HP	Mcc)<ºNšÔéÎûÚyÀmc¼ß·˜	vIT¼ñn¢A ¹t-HãÂ+SL5”ç\ÒzÚ¡¾h°ã‹t)ëı[Ë)¹¶†;¢ÇÚÔ‹I¾•¢Yj«rÜË—Öh9_t§İ) v‘*¨r=Y*ŸIb<*şRÈ:1õ¨KÈ4ç¡osªõÊ ¨œ.Kª)¢W;ö‘£b‚B²Z˜¡³YŠG«åA2s&J-•#“uL+û“§”Á<€õ®2æÉ«â_ä¹úpºòM¦–,A}Aª™¹2Ô©¬›¸½"š†s«#VÕGÙär†–'%ë¤ÊıG*‚TÔ­
+ŸÁ:`(p•Ëş´à>|8‚÷ßÕË='1Œ’rŒ*í­˜œÙË)X´[ÛLqã›Wv‡ÏÎñ1È@‡ÿév^8Õ[k÷oîtO²ª(ë…Õfû/<FPQq[ÕDQçÙ>	tâ–ÒçÒ [=´ÖñE—ØºŞñ· ¤l¸M·å¶İS÷Ì=ÿ¬¿!V¾òäÓOyõ
+À:|óöò)‰ôómmZ(ë²äO7ÇacÆ›(ÿt0º|EmWÓJ¼¯èLw&¯ƒ¯oĞïŠT<ÈïIêÅpßhO:>	‹›óùæ3éĞ)Ÿ™Ğ…fÈs÷hÎ§s&ŸdÁPÊä)Ûš	ï#1Å%ò›-"ÛÁd"-ABgÕ¯¨ °s”¥sjºYŞ{ZØÊü5¯ÈÏ³I1V©jğR„İ–Ÿ+LšrÁ]$]è"é%Ù¨Ø1§T3²a*T'eF3_sÀDîÿ\°U_–“Á6Îà/Zæz!ğ»õìÔHBûn@\¼Â¤a™v”IÜF„¥Í­uËä<|9†c¾5…vÙÇ..Sõã¾²Qœ…L
+-jøUÜY¶—~ĞV¯u|ñ×çË	[Ş|*Ë{lz;—-¾ÜÍ™¿%_6lyÛ}çËáó‡ñåyŸÀ¯ÿ°=ù¼™ü×İÏÜûù¯GògİØöÈ÷ŠbšÉ½@¾™èµİ![Ü7›{>"™|óªÍ,4ŞCk(È…ñmK|Q=M“GsÀ(ÀYßÚ¶²Áw.ü™\xıé6ÿıwæÂıß›÷ŸßÁ…¥ªÌîw.üéL¾sá?í?˜û˜”rá§]~Pòÿ¢‹¹‡iwõşïøspÿaÀ¨§ÜBsÙwÜş|gÀú™|gÀ÷llÇÀ65øsğ³9ø‘táo^=ÔØË7È^ş&¯Œ‘<ö›0)öEùñœôİ/ÌŒ÷ÙCïÖ·Ò|ç³Ş?Òşs^é¾û{ö‡ñİ¿(ã=š6«n[É¿rõwÄÍÕWpU>i3‡µŸì™àÀîYo<Ùƒh&ıo¶'·ÉÌpOâ	ÅÏ?öİ™ÿù.Œü±ûõ3ùf6ùçmaDäˆ¿hñM ÷ú…ãZ×Qµ£
+s†(ı$—»}@‚ßÄJ¥mHÔ!2†å`¦	5Xvtj¡s=aŠp\å s…Ey©ä +,˜-\VålJõ9¤ips÷Ä0êS2ë¥şc»GüvP¦½V¡ä&Myr9*ê«4ñ;í)º ô«zn¦å¤¼Ã#ú&T¥ÜtyÀ™¯u|ñßXìKV ¿¯'¿o$¿oêï>“­d¤íä÷§ÉïÏ¾ÙLÇ#õ×’ß“=ëû=û¦¶Mğ–½¾mòú¡$¶¿.øD®¾‰4ËğjäU1À
+ …7’S“_4.}^øbzûänc¤´RƒŠ®‹Ë		òz1­N‚|FÙyé¿k¡ÍMç‹­zxm*`–Ñ„ªJO×ÜÒ0`pğòç\÷yŸôfŞõp'–Íû|êlÿÿOŸù§Oınr}—×Eóp”éÃ¦rÌ<.ìÒ#V…¸4Öˆ´ĞF$a_ÜtÌ74ºwâ‘=â›Q¯á(ü
+ğCû$9ÑWÛøñÍKU~Ù‡g·ù-Ôô€ÓûñíÑééÎÉÿÅgûÏÖ×Í¯_¿w'œä‡ßôÜ"J^Q¦§/C›ª^R–?™{ƒˆGU9'îğİñ¢$Õ)(Ÿ¯âkdÎ•BiBáEÀS-Á8
+%eøƒCHáÌ(šÄûÊš²&ÙG8È
+ÌÑÀ	Y4a0y+:!¦²Ÿ_JX oCÜó	?¡°æY8JaÂç˜AÓ_+ÒİÒ³µçÛÔ¸aÙÌkZ°İã BÊ"ÙPÁØÂ©‚`ïëÕ»¦¶¾ígÖ_[{æg¶¬"ÉuØK(§0ÄÖòW{	€¤?5’Q-&­òñ(»¬=€üÍîÍœ±BÒÌ5¦ŞÌjJ!Íi3¤¡èP5L‹%(œd›ŸceJüÇ-†ş(ÅD@ƒÑm‰Kg>­€ıW…Ttäb©Ô%©¥@6­˜Û¸]rUÊÂ’§Ìûš*†“»JoânÇ-”ûv_“‰”fÍô^õ|Áñéi•]¸õ!R‡/ahÌEµ«‡ 3x'·=lOÓqš\î‹.Qª[Îığ¢MÃKÎ‰äíÄßQñN"«Z£
+«g¿æ~£ëÙå%^ŞÎÇâÁ›ß¼ôÍ£’*µà”“¾Êı7Î@DğİèğƒùÑ—“âJÆf¢é	A ê/ÑQˆ8oŞ&”¥{’İ½ÃTNÅ­¹œON`™j¨QJ	N$Bà3e®ÄöbÖcYÉíæëPßÍà*nõHîY¥ŸüNTƒbVi3%Ó²šÕ±&\‡a[²c8sØ¬8sï¥Š´T zÜo©Á&î
+=nåhÌa©dÈÉ?j“¿ÀT©%†Íé‘¶Î’dA×]g±l'‘4cåÁ«jd½ˆ¸”'ÖœÕ;é"!<ŒmD²\İZÚE’"¢´V)á@Êñ‡ºÖö~˜™qùv¢V.–E|rw‹ZZËĞú·YÑäîÔœ
+ë¾eZ(	3¯Ç˜— 1!KëAÃß¥L+J¯„FzÈƒS.İºm	ŸV|áÓMÈI”ïİÂ<S¦./š›½ \èÀ#Nf ùÌg&|Ñİùî
+®@‹ÔÃf 3'¾`1ï¹‰€Ì«/”9ŸzÉ6¥R©Ù°ƒHÌyğ:9ƒ¹éìflÏ&]ãùà¬Ä|ÊóD@Lõ%üXÊ÷LÈÕ‚^5êØ÷ú:Ë^içâkSš•~½m‹µ²nxª‹¯ÉSZÎdGmş•T§íE$F*½‰M*Uø7ÄÌ=¬€És9×{&#Oë‡6k‘VZ%"aâ,F}3ì4-+eµK4Nª}4šc¨.FnêÒÖ]§0´ªéÍ¡Á‰s’×M²1•® K™6 ´D†…»ÀïÔ¢Îv#Ã*…*(ëÎ¼ ¨7åÊ•Tˆğm§SÜÛÖº+Ì,LU•šg"eÊoÀôñEm^$¼]D=
+şìà,^rqm×°,­ëœEk¦VNTY<()·à]8Ÿ#*:üaï²ı¢ëÙ-O²Ë'¨…T®'*òé7N:u1º…\ö&rtjœö1êì6{—à¼Dân[â´‰×è1¥àÕM‡s>‹„ğ¨uÄ£iAß¼’‡%Óé¾0Ÿ…T¢«‡J#©eÈtZñÕpZ¨›øiŞú€•Ô'c>ÕZJˆAÆ[u®ÄFÛTöÛ=Æáê–1 §‘‘tóëËv]<UÉãr³ZP•ËÆ¤eVa^?q!€djò×–•†]+h³˜£ÊÍì43ÿuóôïyçdÿ`ÿdÿıîş)íFöatÚûiUÌÊ»°İô]9ÌİtTD°Tğ"üÅ›xÀãĞìä,\QÇ½íq¶CÛË/@jÈo^sï9`¼9Ö^Æ÷ş™´¼ä(7ƒÛ;Üï6ŸõÜÌ@wè?Šá ?£(úº
+ÿ›IÎ¥‘ßç7 úÀÌcc¸¯O;ÇŞ2„ÃšĞÈÎsG	 2·Ÿä×J?ï²0˜Î1 ÉAûÜ»{-\nÅí¡Àï§ßºèæÇv}˜ØÉÁ®{ú¦ñát÷‰Ùyw:(°†©lŞá¤nŠfÖÀ~Çˆ‰³E|?½*Wv²+jxŸ©´È5ô3îÍ	[Áz‹<ÂîÑ»ãİ£÷x>ûû°Lª•_¹ÓæÑÀ±`M-İŸ­tÔŞ ‰üÊ¶¿jeÛÉÊÙsU„(Dxó+ÖÍ®ıÚt5òˆm×«n£ç&«®KËÏ«V>†åa<ĞÏOqX Ãÿ*€ÁÈíyƒÉ¯¥{ršYÄ ¼ÈøÜ_{Şká/­H¼3»Äbl:Ä³tÓŞN~·¾jŸ·NJ­z¬©†qÖ¾fœöçÉ~„”SbóÿT­7 ¬r 
